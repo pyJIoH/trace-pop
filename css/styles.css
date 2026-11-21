@@ -81,26 +81,29 @@ svg { display: block; }
 .kbtn:focus-visible, .tile:focus-visible, .bubble:focus-visible { outline: 4px solid #3D9BE9; outline-offset: 3px; }
 
 /* ---------- home ---------- */
-.screen-home { grid-template: 1fr 1fr / 1fr; gap: clamp(18px, 4vmin, 36px); padding-bottom: calc(var(--safe-b) + 12px); }
-@media (orientation: landscape) { .screen-home { grid-template: 1fr / 1fr 1fr; } }
+/* Four tiles: one under another on an upright screen (wide tiles keep the pictures big), two by two on its side. */
+.screen-home { grid-template: repeat(4, 1fr) / 1fr; gap: clamp(14px, 3vmin, 30px); padding-bottom: calc(var(--safe-b) + 12px); }
+@media (orientation: landscape) { .screen-home { grid-template: 1fr 1fr / 1fr 1fr; } }
 .tile {
   position: relative;
   min-width: 0;
   min-height: 0;
   margin: 0;
-  padding: 8% 10% 6%;
+  padding: clamp(12px, 3.5vmin, 34px) 9% clamp(10px, 2.6vmin, 26px);
   border: 0;
-  border-radius: clamp(28px, 7vmin, 56px);
+  border-radius: clamp(24px, 6vmin, 52px);
   background: var(--card);
-  box-shadow: 0 12px 0 var(--edge), 0 24px 34px rgba(140, 100, 30, 0.16);
+  box-shadow: 0 10px 0 var(--edge), 0 20px 30px rgba(140, 100, 30, 0.16);
   display: grid;
   grid-template-rows: 1fr auto;
-  gap: 6%;
+  gap: clamp(8px, 2vmin, 18px);
   cursor: pointer;
   transition: transform 0.18s var(--spring), box-shadow 0.18s ease-out;
   animation: tile-wobble 5.2s ease-in-out infinite;
 }
-#tileNumbers { animation-delay: -2.6s; }
+#tileNumbers { animation-delay: -1.3s; }
+#tileShapes { animation-delay: -2.6s; }
+#tilePictures { animation-delay: -3.9s; }
 .tile.pressed { transform: translateY(10px); box-shadow: 0 2px 0 var(--edge), 0 6px 10px rgba(140, 100, 30, 0.16); transition-duration: 0.05s; animation: none; }
 .tile-word { position: relative; min-height: 0; display: block; }
 @keyframes tile-wobble {
@@ -174,9 +177,13 @@ svg { display: block; }
 .b-hand .i-redo, .screen-trace.done .b-hand .i-show { display: none; }
 .screen-trace.done .b-hand .i-redo { display: block; }
 .b-prev, .b-next { color: var(--ink-soft); }
-.screen-trace.done .b-next { color: #fff; background: var(--go); box-shadow: 0 6px 0 var(--go-edge), 0 12px 18px rgba(30, 150, 70, 0.25); animation: next-pulse 1.1s ease-in-out 0.6s infinite; }
+/* The glyph is drawn: "next" is the one thing to tap now. It turns green, grows (out of its corner,
+   towards the middle of the screen) and keeps pulsing. Nothing moves on by itself. */
+.b-next { z-index: 2; transform-origin: 100% 100%; transition: transform 0.16s var(--spring), box-shadow 0.16s ease-out, scale 0.4s var(--spring); }
+@media (orientation: landscape) { .b-next { transform-origin: 100% 50%; } }
+.screen-trace.done .b-next { color: #fff; background: var(--go); scale: 1.35; box-shadow: 0 6px 0 var(--go-edge), 0 12px 18px rgba(30, 150, 70, 0.25), 0 0 0 6px rgba(46, 189, 89, 0.22); animation: next-pulse 1.1s ease-in-out 0.6s infinite; }
 .screen-trace.done .b-next.pressed { box-shadow: 0 1px 0 var(--go-edge); animation: none; }
-@keyframes next-pulse { 50% { scale: 1.1; } }
+@keyframes next-pulse { 0%, 100% { scale: 1.35; } 50% { scale: 1.55; } }
 
 .stage { grid-area: stage; position: relative; min-width: 0; min-height: 0; overflow: hidden; touch-action: none; cursor: crosshair; }
 .stage.done { cursor: pointer; }
@@ -204,50 +211,6 @@ svg { display: block; }
 .hand-fill rect { fill: #fff; }
 .hand-crease { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; }
 
-/* The "next one" card: pops up over the finished letter. */
-.pop { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(90, 70, 52, 0.3); }
-.pop.entering { animation: pop-dim 0.25s ease-out both; }
-.pop.entering .pop-card { animation: pop-in 0.4s var(--spring) both; }
-@keyframes pop-dim { from { background: rgba(90, 70, 52, 0); } }
-@keyframes pop-in { from { opacity: 0; scale: 0.6; } }
-.pop-card { display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 3vmin, 24px); }
-.pop-next {
-  --size: clamp(150px, 52vmin, 420px);
-  position: relative;
-  display: block;
-  flex: none;
-  box-sizing: border-box;
-  width: var(--size);
-  height: var(--size);
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 24%;
-  background: var(--card);
-  box-shadow: 0 calc(var(--size) * 0.05) 0 var(--edge), 0 calc(var(--size) * 0.1) calc(var(--size) * 0.14) rgba(70, 45, 10, 0.3);
-  cursor: pointer;
-  transition: transform 0.16s var(--spring), box-shadow 0.16s ease-out;
-}
-.pop-next.pressed { transform: translateY(calc(var(--size) * 0.04)); box-shadow: 0 2px 0 var(--edge); transition-duration: 0.05s; }
-.pop-glyph { position: absolute; inset: 18%; display: block; color: var(--ink-soft); }
-.pop-glyph .ico { position: absolute; inset: 12%; width: 76%; height: 76%; }
-.pop-again { flex: none; }
-.pop-go {
-  position: absolute;
-  right: -9%;
-  bottom: -9%;
-  width: 40%;
-  height: 40%;
-  border-radius: 50%;
-  background: var(--go);
-  color: #fff;
-  box-shadow: 0 calc(var(--size) * 0.025) 0 var(--go-edge), 0 calc(var(--size) * 0.05) calc(var(--size) * 0.07) rgba(30, 150, 70, 0.35);
-  display: grid;
-  place-items: center;
-  animation: next-pulse 1.1s ease-in-out infinite;
-}
-.pop-go .ico { width: 56%; height: 56%; translate: 5% 0; }
-
 /* Success: the whole letter hops and runs through the rainbow, slowly (no fast flashing). */
 .letter.party { animation: letter-hop 0.5s var(--spring); }
 .letter.party .trail { animation: rainbow 1.5s linear; }
@@ -264,6 +227,6 @@ svg { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile, .bubble.next-up, .screen-trace.done .b-next, .pop-go { animation: none; }
+  .tile, .bubble.next-up, .screen-trace.done .b-next { animation: none; }
   .screen.entering, .stage.arriving .letter { animation-duration: 0.01s; }
 }

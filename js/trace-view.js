@@ -47,10 +47,13 @@
       svg = el('svg', { class: 'trace-svg', viewBox: `${-P} ${-P} ${W + P * 2} ${100 + P * 2}` }, stage);
       svg.style.setProperty('--c', glyph.color);
 
-      const rules = el('g', { class: 'rules' }, svg);
-      el('line', { x1: -3000, x2: 3000, y1: 0, y2: 0 }, rules);
-      el('line', { x1: -3000, x2: 3000, y1: 50, y2: 50, class: 'mid' }, rules);
-      el('line', { x1: -3000, x2: 3000, y1: 100, y2: 100 }, rules);
+      // The lines of a copybook, for what is written; a shape or a picture stands on a clean page.
+      if (glyph.kind === 'letter' || glyph.kind === 'number') {
+        const rules = el('g', { class: 'rules' }, svg);
+        el('line', { x1: -3000, x2: 3000, y1: 0, y2: 0 }, rules);
+        el('line', { x1: -3000, x2: 3000, y1: 50, y2: 50, class: 'mid' }, rules);
+        el('line', { x1: -3000, x2: 3000, y1: 100, y2: 100 }, rules);
+      }
 
       letterG = el('g', { class: 'letter' }, svg);
       const roads = el('g', { class: 'roads' }, letterG);
@@ -60,9 +63,15 @@
       strokes.forEach((st) => el('path', { d: st.d, class: 'road', 'stroke-width': T.roadW }, roads));
       strokes.forEach((st) => el('path', { d: st.d, class: 'road-dot' }, dots));
       // The covered parts of each stroke (a tint), and the whole stroke once it is done.
-      tintEls = strokes.map(() => el('path', { class: 'tint', 'stroke-width': T.trailW }, tints));
-      trailEls = strokes.map((st) => {
+      // (Each in its stroke's colour: a picture has a colour per stroke.)
+      tintEls = strokes.map((st, i) => {
+        const p = el('path', { class: 'tint', 'stroke-width': T.trailW }, tints);
+        p.style.setProperty('--c', G.ink(glyph, i));
+        return p;
+      });
+      trailEls = strokes.map((st, i) => {
         const p = el('path', { d: st.d, class: 'trail', 'stroke-width': T.trailW }, trails);
+        p.style.setProperty('--c', G.ink(glyph, i));
         p.style.display = 'none';
         return p;
       });
@@ -143,17 +152,40 @@
     // The engine says where the line is: it starts when the finger enters the figure and ends when
     // it leaves. A line too short to count (a tap, a crossing of the road) fades away at once.
     function inkStart(pt) {
-      const node = el('polyline', {}, inkG);
-      ink = { nodes: [node], node, pts: [pt, pt] };
+      const color = inkColor(pt);
+      const node = inkNode(color);
+      ink = { nodes: [node], node, pts: [pt, pt], color };
       inkDraw();
+    }
+
+    function inkNode(color) {
+      const node = el('polyline', {}, inkG);
+      if (color) node.style.stroke = color;
+      return node;
+    }
+
+    /** In a picture the line takes the colour of the stroke it is on (null: the glyph's one colour). */
+    function inkColor(pt) {
+      if (!glyph.inks) return null;
+      let best = 0;
+      let bestD = Infinity;
+      strokes.forEach((st, i) => {
+        for (let k = 0; k < st.n; k += 2) {
+          const d = (st.x[k] - pt.x) * (st.x[k] - pt.x) + (st.y[k] - pt.y) * (st.y[k] - pt.y);
+          if (d < bestD) { bestD = d; best = i; }
+        }
+      });
+      return glyph.inks[best];
     }
 
     function inkAdd(pt) {
       if (!ink) return;
       const last = ink.pts[ink.pts.length - 1];
       if (Math.hypot(pt.x - last.x, pt.y - last.y) < 0.4) return;
-      if (ink.pts.length >= INK_CHUNK) { // carry on in a fresh piece, joined to the last point
-        ink.node = el('polyline', {}, inkG);
+      const color = inkColor(pt);
+      if (ink.pts.length >= INK_CHUNK || color !== ink.color) { // carry on in a fresh piece, joined to the last point
+        ink.color = color;
+        ink.node = inkNode(color);
         ink.nodes.push(ink.node);
         ink.pts = [last];
       }
@@ -208,6 +240,7 @@
         }
         const ms = TP.clamp((st.len / 100) * T.demoMsPer100, T.demoMinMs, T.demoMaxMs);
         const line = el('path', { d: st.d, class: 'demo-trail', 'stroke-width': T.trailW }, demoG);
+        line.style.setProperty('--c', G.ink(glyph, list[n]));
         await tween(ms, (t) => {
           const s = st.len * TP.ease(t);
           pos = G.at(st, s);

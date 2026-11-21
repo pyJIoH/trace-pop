@@ -53,8 +53,9 @@
     const svg = TP.svgEl('svg', { class: 'glyph', viewBox: `${-pad} ${-pad} ${width + pad * 2} ${100 + pad * 2}`, 'aria-hidden': 'true' });
     let x = 0;
     list.forEach((g, i) => {
-      const group = TP.svgEl('g', { transform: `translate(${x} 0)`, stroke: opts.colors ? opts.colors(g, i) : g.color }, svg);
-      for (const d of g.strokes) TP.svgEl('path', { d, fill: 'none', 'stroke-width': pen, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, group);
+      const group = TP.svgEl('g', { transform: `translate(${x} 0)`, fill: 'none', 'stroke-width': pen, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
+      // One colour for the whole glyph if asked for; otherwise its own (a picture has one per stroke).
+      g.strokes.forEach((d, k) => TP.svgEl('path', { d, stroke: opts.colors ? opts.colors(g, i) : TP.glyphs.ink(g, k) }, group));
       x += g.w + gap;
     });
     return svg;

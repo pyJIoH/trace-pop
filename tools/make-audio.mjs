@@ -39,7 +39,7 @@ const { glyphs, speech } = sandbox.window.TP;
 
 // ---- check the list ----
 const problems = [];
-const used = new Set(['letters', 'numbers', 'hint-start', 'all-letters', 'all-numbers', ...speech.PRAISE]);
+const used = new Set(speech.OTHER);
 for (const g of glyphs.all) {
   const key = speech.keyFor(g);
   used.add(key);

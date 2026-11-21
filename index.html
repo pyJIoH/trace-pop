@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Trace Pop</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="description" content="Trace letters and numbers with a finger. For kids 3–6. No ads, works offline.">
+<meta name="description" content="Trace letters, numbers, shapes and pictures with a finger. For kids 3–6. No ads, works offline.">
 <meta name="theme-color" content="#FFF4DC">
 <meta name="color-scheme" content="light">
 <meta name="mobile-web-app-capable" content="yes">
@@ -39,7 +39,7 @@
   </defs>
 </svg>
 
-<!-- Home: two big tiles -->
+<!-- Home: four big tiles -->
 <main class="screen screen-home" id="home">
   <button class="tile" id="tileLetters" type="button" aria-label="Letters">
     <span class="tile-word" id="wordLetters"></span>
@@ -49,9 +49,17 @@
     <span class="tile-word" id="wordNumbers"></span>
     <span class="dots" id="dotsNumbers"></span>
   </button>
+  <button class="tile" id="tileShapes" type="button" aria-label="Shapes">
+    <span class="tile-word" id="wordShapes"></span>
+    <span class="dots" id="dotsShapes"></span>
+  </button>
+  <button class="tile" id="tilePictures" type="button" aria-label="Pictures">
+    <span class="tile-word" id="wordPictures"></span>
+    <span class="dots" id="dotsPictures"></span>
+  </button>
 </main>
 
-<!-- Grid: every letter or number of one set -->
+<!-- Grid: everything in one set (letters, numbers, shapes or pictures) -->
 <section class="screen screen-grid" id="grid" hidden>
   <button class="kbtn" id="gridHome" type="button" aria-label="Home"><svg class="ico"><use href="#i-home"/></svg></button>
   <div class="bubbles" id="bubbles"></div>
@@ -59,21 +67,11 @@
 
 <!-- Trace: one glyph. The buttons live outside the letter's area. -->
 <section class="screen screen-trace" id="trace" hidden>
-  <button class="kbtn b-grid" id="toGrid" type="button" aria-label="All letters"><svg class="ico"><use href="#i-grid"/></svg></button>
+  <button class="kbtn b-grid" id="toGrid" type="button" aria-label="All of them"><svg class="ico"><use href="#i-grid"/></svg></button>
   <button class="kbtn b-hand" id="showMe" type="button" aria-label="Show me"><svg class="ico i-show"><use href="#i-hand"/></svg><svg class="ico i-redo"><use href="#i-again"/></svg></button>
   <button class="kbtn b-prev" id="prev" type="button" aria-label="Back"><svg class="ico"><use href="#i-prev"/></svg></button>
   <button class="kbtn b-next" id="next" type="button" aria-label="Next"><svg class="ico"><use href="#i-next"/></svg></button>
   <div class="stage" id="stage"></div>
-  <!-- After a finished glyph: one big thing to tap, with the next glyph on it. -->
-  <div class="pop" id="pop" hidden>
-    <div class="pop-card">
-      <button class="pop-next" id="popNext" type="button" aria-label="Next">
-        <span class="pop-glyph" id="popGlyph"></span>
-        <span class="pop-go"><svg class="ico"><use href="#i-next"/></svg></span>
-      </button>
-      <button class="kbtn pop-again" id="popAgain" type="button" aria-label="Again"><svg class="ico"><use href="#i-again"/></svg></button>
-    </div>
-  </div>
 </section>
 
 </body>

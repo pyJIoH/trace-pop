@@ -35,7 +35,6 @@
     demoMaxMs: 1500,    // … and at most this
     hintIdleMs: 7000,   // nothing drawn for this long: the hand shows how
     hintRepeatMs: 10000, // … and again after this long, for as long as nothing happens
-    nextPopMs: 1500,    // after a finished letter, the "next one" card appears this much later
     replayGapMs: 1500,  // taps on a finished letter repeat the party no more often than this
 
     // --- sound ---

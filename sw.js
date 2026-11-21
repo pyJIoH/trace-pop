@@ -8,7 +8,7 @@
 
    Raise VERSION with every change to the app's files: that is how an open app learns there is a
    new version (it then reloads itself, but only while the home screen is showing). */
-const VERSION = 'tracepop-v4';
+const VERSION = 'tracepop-v5';
 const AUDIO = 'tracepop-audio';
 
 const SHELL = [

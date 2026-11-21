@@ -1,5 +1,5 @@
-/* Trace Pop — the letters and digits, as strokes. No font: everything a child sees is drawn from
-   these paths (the road, the trail, the grid, the tiles).
+/* Trace Pop — the letters, digits, shapes and pictures, as strokes. No font and no images:
+   everything a child sees is drawn from these paths (the road, the trail, the grid, the tiles).
 
    Numbers from 10 up are not listed: they are put together from the digits.
 
@@ -7,6 +7,10 @@
    centre line of the pen, drawn in the direction of writing; its first point is where it starts.
    Paths use absolute M L C Q A only, one command letter per segment.
    Style: school print, ball and stick (Zaner-Bloser stroke order).
+
+   Shapes and pictures follow what the drawing engine can tell apart (see tracer.js): a few bold
+   lines, no small details, every stroke longer than the shortest line that counts, and a stroke
+   that stands alone (a ray of the sun) at least 40 long.
 
    Classic script (no modules) so the app also runs from file://, and pure logic (no DOM) so the
    same file loads in Node for tools/check.mjs. */
@@ -18,6 +22,9 @@
 
   const L = (id, w, strokes) => ({ id, kind: 'letter', w, strokes });
   const N = (id, w, strokes) => ({ id, kind: 'number', w, strokes });
+  const S = (id, w, strokes) => ({ id, kind: 'shape', w, strokes });
+  /** A picture: every stroke has a colour of its own. parts = [[colour, path], …], the main one first. */
+  const P = (id, w, parts) => ({ id, kind: 'picture', w, color: parts[0][0], inks: parts.map((p) => p[0]), strokes: parts.map((p) => p[1]) });
 
   const LIST = [
     L('A', 80, ['M40 0 L4 100', 'M40 0 L76 100', 'M17 64 L63 64']),
@@ -82,10 +89,62 @@
     LIST.push({ id: String(n), kind: 'number', w: x - DIGIT_GAP, strokes });
   }
 
+  // Shapes: one line all the way round, the way a child draws them.
+  LIST.push(
+    S('circle', 100, ['M50 2 A48 48 0 1 0 50 98 A48 48 0 1 0 50 2']),
+    S('oval', 130, ['M65 10 A62 40 0 1 0 65 90 A62 40 0 1 0 65 10']),
+    S('square', 100, ['M6 6 L6 94 L94 94 L94 6 L6 6']),
+    S('rectangle', 140, ['M6 16 L6 84 L134 84 L134 16 L6 16']),
+    S('triangle', 110, ['M55 4 L4 96 L106 96 L55 4']),
+    S('diamond', 84, ['M42 0 L4 50 L42 100 L80 50 L42 0']),
+    S('semicircle', 120, ['M6 76 A54 54 0 0 1 114 76 L6 76']),
+    S('star', 106, ['M53 1 L38.9 35.6 L1.6 38.3 L30.2 62.4 L21.3 98.7 L53 79 L84.7 98.7 L75.8 62.4 L104.4 38.3 L67.1 35.6 L53 1']),
+    S('heart', 100, ['M50 26 C44 4 8 0 4 30 C2 56 30 74 50 96 C70 74 98 56 96 30 C92 0 56 4 50 26']),
+    S('cross', 100, ['M50 4 L50 96', 'M4 50 L96 50'])
+  );
+
+  // Pictures, in their own colours.
+  const YELLOW = '#E5B41F';
+  const ORANGE = '#F2994A';
+  const RED = '#EB5757';
+  const PINK = '#EC5FA4';
+  const VIOLET = '#9B59D0';
+  const BLUE = '#3D9BE9';
+  const GREEN = '#49B265';
+  const BROWN = '#A9714B';
+  const DARK = '#6B5847';
+  const GREY = '#A08E78';
+  LIST.push(
+    P('sun', 148, [ // rising: rays long enough to be drawn do not fit around a whole sun
+      [YELLOW, 'M42 96 A32 32 0 0 1 106 96 L42 96'],
+      [ORANGE, 'M33.5 66.6 L1.2 43.1'], [ORANGE, 'M51.3 51.4 L33.1 15.8'], [ORANGE, 'M74 46 L74 6'], [ORANGE, 'M96.7 51.4 L114.9 15.8'], [ORANGE, 'M114.5 66.6 L146.8 43.1'],
+    ]),
+    P('moon', 70, [[YELLOW, 'M62 4 A48 48 0 1 0 62 96 A56 56 0 0 1 62 4']]),
+    P('cloud', 116, [[BLUE, 'M19 86 A22 22 0 0 1 21 44 A24 24 0 0 1 57 22 A24 24 0 0 1 95 42 A23 23 0 0 1 97 86 L19 86']]),
+    P('house', 100, [[RED, 'M50 0 L98 44 L2 44 L50 0'], [ORANGE, 'M14 44 L14 100 L86 100 L86 44']]),
+    P('tree', 80, [[GREEN, 'M40 0 A34 34 0 1 0 40 68 A34 34 0 1 0 40 0'], [BROWN, 'M40 100 L40 40']]),
+    P('flower', 100, [
+      [PINK, 'M50 55 A13 13 0 0 1 29.1 39.8 A13 13 0 0 1 37.1 15.2 A13 13 0 0 1 62.9 15.2 A13 13 0 0 1 70.9 39.8 A13 13 0 0 1 50 55'],
+      [GREEN, 'M50 55 L50 100'], [GREEN, 'M50 90 Q74 92 84 72'],
+    ]),
+    P('apple', 88, [
+      [RED, 'M44 36 C34 25 8 28 8 60 C8 86 28 102 44 95 C60 102 80 86 80 60 C80 28 54 25 44 36'],
+      [BROWN, 'M44 36 Q44 16 54 2'], [GREEN, 'M47 18 Q64 2 84 12'],
+    ]),
+    P('fish', 132, [[ORANGE, 'M36 50 C56 10 110 8 126 50 C110 92 56 90 36 50'], [RED, 'M36 50 L4 22 L4 78 L36 50']]),
+    P('boat', 120, [[RED, 'M4 72 L116 72 L98 100 L22 100 L4 72'], [BROWN, 'M56 72 L56 0'], [BLUE, 'M56 2 L104 48 L56 48']]),
+    P('balloon', 70, [[PINK, 'M35 0 A29 31 0 1 0 35 62 A29 31 0 1 0 35 0'], [GREY, 'M35 62 Q47 72 35 82 Q23 92 35 100']]),
+    P('umbrella', 110, [[VIOLET, 'M5 52 A50 50 0 0 1 105 52 L5 52'], [BROWN, 'M55 52 L55 86 A12 12 0 0 1 31 86']]),
+    P('car', 140, [
+      [BLUE, 'M6 68 L6 42 L34 36 L50 6 L94 6 L110 36 L134 42 L134 68 L6 68'],
+      [DARK, 'M38 68 A15 15 0 1 0 38 98 A15 15 0 1 0 38 68'], [DARK, 'M104 68 A15 15 0 1 0 104 98 A15 15 0 1 0 104 68'],
+    ])
+  );
+
   const byId = {};
-  const sets = { letter: [], number: [] };
+  const sets = { letter: [], number: [], shape: [], picture: [] };
   for (const g of LIST) {
-    g.color = COLORS[sets[g.kind].length % COLORS.length];
+    if (!g.color) g.color = COLORS[sets[g.kind].length % COLORS.length];
     byId[g.id] = g;
     sets[g.kind].push(g);
   }
@@ -257,6 +316,8 @@
     colors: COLORS,
     get: (id) => byId[id],
     set: (kind) => sets[kind],
+    /** The colour of one stroke: a picture's strokes have their own, everything else has one colour. */
+    ink: (glyph, i) => (glyph.inks ? glyph.inks[i] : glyph.color),
     parse,
     sample,
     sampled,

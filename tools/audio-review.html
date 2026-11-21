@@ -50,9 +50,11 @@
   const groups = [
     ['Letters', glyphs.set('letter').map((g) => [speech.keyFor(g), g.id])],
     ['Numbers', glyphs.set('number').map((g) => [speech.keyFor(g), g.id])],
-    ['Tiles', [['letters', 'ABC'], ['numbers', '123']]],
+    ['Shapes', glyphs.set('shape').map((g) => [speech.keyFor(g), '◆'])],
+    ['Pictures', glyphs.set('picture').map((g) => [speech.keyFor(g), '✿'])],
+    ['Tiles', [['letters', 'ABC'], ['numbers', '123'], ['shapes', '◆'], ['pictures', '✿']]],
     ['Praise', speech.PRAISE.map((k) => [k, '★'])],
-    ['Hint and finale', [['hint-start', '?'], ['all-letters', 'A–Z'], ['all-numbers', '0–9']]],
+    ['Hint and finale', [['hint-start', '?'], ['all-letters', 'A–Z'], ['all-numbers', '0–30'], ['all-shapes', '◆'], ['all-pictures', '✿']]],
   ];
   const list = document.getElementById('list');
   const rows = [];

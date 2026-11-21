@@ -33,18 +33,28 @@ function ok(cond, what) {
 
 // ---------- 1. glyph data ----------
 section('Glyphs');
-const wantIds = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...Array.from({ length: 31 }, (_, i) => String(i))];
+const SHAPES = ['circle', 'oval', 'square', 'rectangle', 'triangle', 'diamond', 'semicircle', 'star', 'heart', 'cross'];
+const PICTURES = ['sun', 'moon', 'cloud', 'house', 'tree', 'flower', 'apple', 'fish', 'boat', 'balloon', 'umbrella', 'car'];
+const wantIds = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...Array.from({ length: 31 }, (_, i) => String(i)), ...SHAPES, ...PICTURES];
+ok(glyphs.set('shape').map((g) => g.id).join() === SHAPES.join(), 'the shapes are not the expected ones');
+ok(glyphs.set('picture').map((g) => g.id).join() === PICTURES.join(), 'the pictures are not the expected ones');
+/** One figure, not a number put together from two digits. */
+const single = (g) => !(g.kind === 'number' && g.id.length > 1);
+const drawn = (g) => g.kind === 'shape' || g.kind === 'picture';
 ok(glyphs.all.length === wantIds.length, `expected ${wantIds.length} glyphs, found ${glyphs.all.length}`);
 for (const id of wantIds) ok(!!glyphs.get(id), `glyph ${id} is missing`);
 ok(new Set(glyphs.all.map((g) => g.id)).size === glyphs.all.length, 'glyph ids repeat');
 for (const g of glyphs.all) {
-  const widest = g.id.length > 1 ? 190 : 90; // a number of two digits is two glyphs wide
+  const widest = !single(g) ? 190 : drawn(g) ? 150 : 90; // a number of two digits is two glyphs wide
   ok(g.w >= 40 && g.w <= widest, `${g.id}: width ${g.w} is outside 40–${widest}`);
   ok(g.strokes.length >= 1, `${g.id}: no strokes`);
+  ok(/^#[0-9A-F]{6}$/i.test(g.color), `${g.id}: no colour`);
+  if (g.kind === 'picture') ok(g.inks && g.inks.length === g.strokes.length && g.inks.every((c) => /^#[0-9A-F]{6}$/i.test(c)), `${g.id}: a picture needs a colour for every stroke`);
   g.strokes.forEach((d, i) => {
     let st;
     try { st = glyphs.sample(d, 1); } catch (e) { ok(false, `${g.id} stroke ${i + 1}: ${e.message}`); return; }
-    ok(st.len >= 25, `${g.id} stroke ${i + 1}: only ${st.len.toFixed(1)} long, a tap could finish it`);
+    // A line drawn from one end of a stroke to the other must be long enough to count.
+    ok(st.len >= TUNING.minRun + 2, `${g.id} stroke ${i + 1}: only ${st.len.toFixed(1)} long, drawing it would not count`);
     let out = false;
     let gap = 0;
     for (let k = 0; k < st.n; k++) {
@@ -69,7 +79,7 @@ console.log(`  ${glyphs.all.length} glyphs, ${glyphs.all.reduce((n, g) => n + g.
 
 // ---------- 2. phrases and audio ----------
 section('Phrases');
-const usedKeys = new Set(['letters', 'numbers', 'hint-start', 'all-letters', 'all-numbers', ...speech.PRAISE]);
+const usedKeys = new Set(speech.OTHER);
 for (const g of glyphs.all) {
   const key = speech.keyFor(g);
   usedKeys.add(key);
@@ -209,7 +219,7 @@ for (const g of glyphs.all) {
   draw(r.t, [[-15, 8], [g.w + 15, 8], [g.w + 15, 50], [-15, 50], [-15, 92], [g.w + 15, 92]]);
   ok(r.log.glyph === 0, `${g.id}: three sweeps across must not finish it`);
   near(r, `${g.id} sweeps across`);
-  if (g.id.length === 1) { // (two sweeps down are a fair 11)
+  if (single(g)) { // (two sweeps down are a fair 11)
     r = rig(g);
     draw(r.t, [[g.w * 0.15, -15], [g.w * 0.15, 115], [g.w * 0.85, 115], [g.w * 0.85, -15]]);
     ok(r.log.glyph === 0, `${g.id}: two sweeps down must not finish it`);
@@ -221,9 +231,10 @@ for (const g of glyphs.all) {
   // A dense scribble over the whole glyph, lines 7 units apart: across, down, and both diagonals.
   // It crosses every part of the figure many times, but crossing is not drawing. (Where the
   // scribble happens to run along every stroke it is drawing, and counts: up-and-down lines over
-  // a glyph made of upright strokes, a slanted scribble over the small loops of 8.)
-  const ALONG = { down: '1JMNUVWXY', 'the other diagonal': '8' };
-  if (g.id.length === 1) {
+  // a glyph made of upright strokes, a slanted scribble over the small loops of 8 or the slanted
+  // sides of a star, lines across a boat or a car, which are mostly lines across themselves.)
+  const ALONG = { across: ['boat', 'car'], down: [...'1JMNUVWXY'], 'one diagonal': ['star'], 'the other diagonal': ['8', 'star'] };
+  if (single(g)) {
     const span = g.w + 130;
     const zig = (to) => {
       const pts = [];
@@ -237,7 +248,7 @@ for (const g of glyphs.all) {
       'the other diagonal': zig((u, v) => [(u - v) * 0.7 + 40, (u + v) * 0.7 - 40]),
     };
     for (const [name, pts] of Object.entries(ways)) {
-      if ((ALONG[name] || '').includes(g.id)) continue;
+      if ((ALONG[name] || []).includes(g.id)) continue;
       r = rig(g);
       draw(r.t, pts);
       ok(r.log.glyph === 0, `${g.id}: a dense scribble ${name} must not finish it`);
