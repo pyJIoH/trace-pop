@@ -11,6 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trace Pop">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>html, body { background: #FFF4DC; }</style>
 <link rel="stylesheet" href="css/styles.css">
 <script defer src="js/util.js"></script>
@@ -61,6 +64,16 @@
   <button class="kbtn b-prev" id="prev" type="button" aria-label="Back"><svg class="ico"><use href="#i-prev"/></svg></button>
   <button class="kbtn b-next" id="next" type="button" aria-label="Next"><svg class="ico"><use href="#i-next"/></svg></button>
   <div class="stage" id="stage"></div>
+  <!-- After a finished glyph: one big thing to tap, with the next glyph on it. -->
+  <div class="pop" id="pop" hidden>
+    <div class="pop-card">
+      <button class="pop-next" id="popNext" type="button" aria-label="Next">
+        <span class="pop-glyph" id="popGlyph"></span>
+        <span class="pop-go"><svg class="ico"><use href="#i-next"/></svg></span>
+      </button>
+      <button class="kbtn pop-again" id="popAgain" type="button" aria-label="Again"><svg class="ico"><use href="#i-again"/></svg></button>
+    </div>
+  </div>
 </section>
 
 </body>

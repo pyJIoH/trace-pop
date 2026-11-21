@@ -32,12 +32,13 @@ function ok(cond, what) {
 
 // ---------- 1. glyph data ----------
 section('Glyphs');
-const wantIds = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
+const wantIds = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...Array.from({ length: 31 }, (_, i) => String(i))];
 ok(glyphs.all.length === wantIds.length, `expected ${wantIds.length} glyphs, found ${glyphs.all.length}`);
 for (const id of wantIds) ok(!!glyphs.get(id), `glyph ${id} is missing`);
 ok(new Set(glyphs.all.map((g) => g.id)).size === glyphs.all.length, 'glyph ids repeat');
 for (const g of glyphs.all) {
-  ok(g.w >= 40 && g.w <= 90, `${g.id}: width ${g.w} is outside 40–90`);
+  const widest = g.id.length > 1 ? 190 : 90; // a number of two digits is two glyphs wide
+  ok(g.w >= 40 && g.w <= widest, `${g.id}: width ${g.w} is outside 40–${widest}`);
   ok(g.strokes.length >= 1, `${g.id}: no strokes`);
   g.strokes.forEach((d, i) => {
     let st;
@@ -193,12 +194,14 @@ for (const g of glyphs.all) {
   draw(r.t, [[-15, 8], [g.w + 15, 8], [g.w + 15, 50], [-15, 50], [-15, 92], [g.w + 15, 92]]);
   ok(r.log.glyph === 0, `${g.id}: three sweeps across must not finish it`);
   near(r, `${g.id} sweeps across`);
-  r = rig(g);
-  draw(r.t, [[g.w * 0.15, -15], [g.w * 0.15, 115], [g.w * 0.85, 115], [g.w * 0.85, -15]]);
-  ok(r.log.glyph === 0, `${g.id}: two sweeps down must not finish it`);
-  r = rig(g);
-  draw(r.t, [[-10, -10], [g.w + 10, 110], [g.w + 10, -10], [-10, 110]]);
-  if (g.id !== 'X') ok(r.log.glyph === 0, `${g.id}: a big cross must not finish it`); // a big cross is an X
+  if (g.id.length === 1) { // (two sweeps down are a fair 11)
+    r = rig(g);
+    draw(r.t, [[g.w * 0.15, -15], [g.w * 0.15, 115], [g.w * 0.85, 115], [g.w * 0.85, -15]]);
+    ok(r.log.glyph === 0, `${g.id}: two sweeps down must not finish it`);
+    r = rig(g);
+    draw(r.t, [[-10, -10], [g.w + 10, 110], [g.w + 10, -10], [-10, 110]]);
+    if (g.id !== 'X') ok(r.log.glyph === 0, `${g.id}: a big cross must not finish it`); // a big cross is an X
+  }
 
   // A doodle in the middle.
   r = rig(g);

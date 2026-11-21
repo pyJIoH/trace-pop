@@ -1,6 +1,8 @@
 /* Trace Pop — the letters and digits, as strokes. No font: everything a child sees is drawn from
    these paths (the road, the trail, the grid, the tiles).
 
+   Numbers from 10 up are not listed: they are put together from the digits.
+
    Units: height 100. y = 0 is the top line, 50 the middle line, 100 the base line. A stroke is the
    centre line of the pen, drawn in the direction of writing; its first point is where it starts.
    Paths use absolute M L C Q A only, one command letter per segment.
@@ -11,6 +13,8 @@
 (function () {
   'use strict';
   const TP = (window.TP = window.TP || {});
+
+  const NEED = { M: 2, L: 2, C: 6, Q: 4, A: 7 }; // numbers after each path command
 
   const L = (id, w, strokes) => ({ id, kind: 'letter', w, strokes });
   const N = (id, w, strokes) => ({ id, kind: 'number', w, strokes });
@@ -58,6 +62,26 @@
   // Eight rainbow colours, strong but not acid. A glyph keeps its colour everywhere.
   const COLORS = ['#EB5757', '#F2994A', '#E5B41F', '#1FB5A5', '#3D9BE9', '#5B6EE1', '#9B59D0', '#EC5FA4'];
 
+  /** A stroke moved sideways by dx (used to stand two digits side by side). */
+  function shift(d, dx) {
+    const X = { M: [0], L: [0], Q: [0, 2], C: [0, 2, 4], A: [5] }; // which numbers are x positions
+    return parse(d).map(({ c, n }) => c + n.map((v, i) => (X[c].includes(i) ? +(v + dx).toFixed(1) : v)).join(' ')).join(' ');
+  }
+
+  // 10 … 30: two digits side by side, each written the way it is written alone.
+  const DIGIT_GAP = 10;
+  const LAST_NUMBER = 30;
+  for (let n = 10; n <= LAST_NUMBER; n++) {
+    const strokes = [];
+    let x = 0;
+    for (const ch of String(n)) {
+      const digit = LIST.find((g) => g.id === ch);
+      for (const d of digit.strokes) strokes.push(shift(d, x));
+      x += digit.w + DIGIT_GAP;
+    }
+    LIST.push({ id: String(n), kind: 'number', w: x - DIGIT_GAP, strokes });
+  }
+
   const byId = {};
   const sets = { letter: [], number: [] };
   for (const g of LIST) {
@@ -67,7 +91,6 @@
   }
 
   // ---------- path → points ----------
-  const NEED = { M: 2, L: 2, C: 6, Q: 4, A: 7 };
 
   /** 'M40 0 L4 100' → [{ c: 'M', n: [40, 0] }, …]. Throws on anything outside the small subset. */
   function parse(d) {

@@ -32,7 +32,7 @@
   function go(name) {
     if (name === screen) return;
     TP.lockTaps(350); // touches during the change are ignored
-    if (screen === 'trace') view.hide();
+    if (screen === 'trace') { view.hide(); hidePop(); }
     for (const s of $$('.screen')) s.hidden = s.id !== name;
     screen = name;
     const el = $('#' + name);
@@ -153,6 +153,8 @@
       // The chord first, then the name, then a word of praise (or the big news: all of them!).
       const after = wasLast ? (kind === 'letter' ? 'all-letters' : 'all-numbers') : praise();
       S.say([SP.keyFor(g), after], { delay: 0.3, gap: 0.3 });
+      clearTimeout(popTimer);
+      popTimer = setTimeout(showPop, TP.TUNING.nextPopMs);
     },
     onTapDone() {
       const now = performance.now();
@@ -161,9 +163,6 @@
       view.celebrate();
       S.fanfare();
       S.say(SP.keyFor(view.glyph()), { delay: 0.3 });
-    },
-    onVoiceHint() {
-      S.say('hint-start');
     },
   });
 
@@ -178,34 +177,70 @@
     $('#trace').classList.remove('done');
     $('#trace').style.setProperty('--c', g.color);
     noteStep = 0;
-    view.show(g);
-    S.say(SP.keyFor(g), { delay: 0.15 });
+    hidePop();
+    view.show(g); // silently: the voice names the glyph only once it is drawn
   }
+
+  // ---------- the "next one" card ----------
+  // A moment after a glyph is finished a big card pops up with the next glyph on it: one obvious
+  // thing to tap. Nothing moves on by itself; a tap beside the card puts it away.
+  let popTimer = 0;
+
+  function showPop() {
+    const list = G.set(kind);
+    const next = list[index + 1];
+    const face = $('#popGlyph');
+    face.textContent = '';
+    if (next) {
+      face.appendChild(TP.glyphSvg(next.id, { stroke: 15 }));
+    } else { // the last one of the set: back to all of them
+      face.appendChild(TP.icon('grid'));
+    }
+    const pop = $('#pop');
+    pop.hidden = false;
+    pop.classList.remove('entering');
+    void pop.offsetWidth;
+    pop.classList.add('entering');
+    TP.lockTaps(300); // a finger still busy on the letter must not hit the card by accident
+  }
+
+  function hidePop() {
+    clearTimeout(popTimer);
+    $('#pop').hidden = true;
+  }
+
 
   /** ◀ ▶ always work. Past either end of the set they lead back to the grid. */
   function step(by) {
     const list = G.set(kind);
     const to = index + by;
-    if (to < 0 || to >= list.length) { S.stopSpeech(); openGrid(kind); return; }
+    hidePop();
+    if (to < 0 || to >= list.length) { openGrid(kind); return; }
     index = to;
     TP.lockTaps(250);
     showGlyph();
   }
 
+  /** ↺ again: wipes the drawing, the star stays. */
+  function again() {
+    hidePop();
+    $('#trace').classList.remove('done');
+    noteStep = 0;
+    S.stopSpeech();
+    view.restart();
+  }
+
   function bindTrace() {
-    TP.onTap($('#toGrid'), () => { S.stopSpeech(); openGrid(kind); });
+    TP.onTap($('#toGrid'), () => { hidePop(); openGrid(kind); });
+    TP.onTap($('#popNext'), () => step(1));
+    TP.onTap($('#popAgain'), again);
+    // A tap beside the card puts it away (the letter can be admired, and tapped for another party).
+    $('#pop').addEventListener('pointerup', (e) => { if (e.target === e.currentTarget) hidePop(); });
     TP.onTap($('#prev'), () => step(-1));
     TP.onTap($('#next'), () => step(1));
     TP.onTap($('#showMe'), () => {
-      if (view.isDone()) { // ↺ again: wipes the trail, the star stays
-        $('#trace').classList.remove('done');
-        noteStep = 0;
-        S.stopSpeech();
-        view.restart();
-      } else { // the hand: says the name again and shows how it is written
-        S.say(SP.keyFor(view.glyph()));
-        view.demo();
-      }
+      if (view.isDone()) again();
+      else view.demo(); // the hand shows how it is written
     });
     TP.onTap($('#gridHome'), () => { refreshHome(); go('home'); });
   }

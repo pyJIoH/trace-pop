@@ -14,8 +14,7 @@
 
   /**
    * createTraceView(stage, hooks)
-   * hooks: onProgress({ t, x, y }), onStrokeDone({ stroke, last }), onDone(glyph), onTapDone(),
-   *        onVoiceHint()
+   * hooks: onProgress({ t, x, y }), onStrokeDone({ stroke, last }), onDone(glyph), onTapDone()
    * returns: show(glyph, { intro }), demo(), restart(), celebrate(), hide(), isDone()
    */
   TP.createTraceView = function (stage, hooks) {
@@ -31,8 +30,6 @@
     let raf = 0;
     let demo = null;       // the running hand demo: { cancelled }
     let idleTimer = 0;
-    let idleCount = 0;
-    let voiceHinted = false;
     let inverse = null;    // screen → glyph units
     let ink = null;        // the line being drawn: { id, nodes, node, pts }
     let tapStart = null;   // a tap on the finished letter
@@ -217,43 +214,32 @@
       if (demo === token) stopDemo();
     }
 
+    /** The hand writes the whole glyph (the "show me" button). */
     function demoAll() {
       if (!tracer) return;
-      armIdle();
-      return runDemo(strokes.map((st, i) => i));
+      clearTimeout(idleTimer);
+      return runDemo(strokes.map((st, i) => i)).then(() => armIdle(T.hintRepeatMs));
     }
 
-    /** A nudge: the hand draws the first stroke that is not done yet. */
-    function showWay() {
-      if (!tracer || finished) return;
-      const i = tracer.state().strokes.findIndex((info) => !info.done);
-      if (i >= 0) runDemo([i]);
-    }
-
-    // ---------- hints, step by step, never a telling-off ----------
-    function armIdle() {
+    // ---------- the hint: only after a quiet while, never a telling-off ----------
+    function armIdle(ms) {
       clearTimeout(idleTimer);
       if (!tracer || finished) return;
-      idleTimer = setTimeout(onIdle, T.hintIdleMs);
+      idleTimer = setTimeout(onIdle, ms || T.hintIdleMs);
     }
 
+    /** Nothing has been drawn for a while: the hand shows the strokes that are still to do. */
     function onIdle() {
       if (!tracer || finished) return;
       if (tracer.state().active || demo) { armIdle(); return; }
-      idleCount++;
-      if (idleCount === 2 && !voiceHinted) {
-        voiceHinted = true;
-        if (hooks.onVoiceHint) hooks.onVoiceHint();
-      } else if (idleCount % 2 === 1) {
-        showWay();
-      }
-      armIdle();
+      const todo = [];
+      tracer.state().strokes.forEach((info, i) => { if (!info.done) todo.push(i); });
+      runDemo(todo).then(() => armIdle(T.hintRepeatMs));
     }
 
-    /** Any touch: whatever hint is playing stops at once. */
+    /** Any touch: whatever hint is playing stops at once, and the quiet while starts again. */
     function touched() {
       stopDemo();
-      idleCount = 0;
       armIdle();
     }
 
@@ -324,7 +310,6 @@
         armIdle();
       });
       tracer.on('progress', (e) => {
-        idleCount = 0;
         invalidate();
         if (hooks.onProgress) hooks.onProgress(e);
       });
@@ -361,20 +346,14 @@
       strokes = G.sampled(g);
       tracer = TP.createTracer(g);
       finished = false;
-      idleCount = 0;
-      voiceHinted = false;
       stage.classList.remove('done', 'drawing', 'demoing');
       build();
       wire();
       render();
-      if (opts.intro === false) { armIdle(); return; }
+      armIdle(); // no demo on opening: the hand comes only if nothing is drawn for a while
+      if (opts.intro === false) return;
       stage.classList.add('arriving');
       setTimeout(() => { if (mine === shown) stage.classList.remove('arriving'); }, 400);
-      // The letter appears, the voice names it, then the hand shows how it is written.
-      const token = (demo = { cancelled: false });
-      tween(T.introDelayMs, () => {}, token).then((done) => {
-        if (done && mine === shown && demo === token) { demo = null; demoAll(); }
-      });
     }
 
     function hide() {
