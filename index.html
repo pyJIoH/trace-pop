@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trace Pop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="description" content="Trace letters and numbers with a finger. For kids 3–6. No ads, works offline.">
+<meta name="theme-color" content="#FFF4DC">
+<meta name="color-scheme" content="light">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Trace Pop">
+<style>html, body { background: #FFF4DC; }</style>
+<link rel="stylesheet" href="css/styles.css">
+<script defer src="js/util.js"></script>
+<script defer src="js/glyphs.js"></script>
+<script defer src="js/tracer.js"></script>
+<script defer src="js/speech.js"></script>
+<script defer src="js/sounds.js"></script>
+<script defer src="js/trace-view.js"></script>
+<script defer src="js/app.js"></script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.2L12 4.2l8 7"/><path d="M6.4 10v9.3h11.2V10"/><path d="M10.2 19.3v-5h3.6v5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4.2" y="4.2" width="6.2" height="6.2" rx="1.8"/><rect x="13.6" y="4.2" width="6.2" height="6.2" rx="1.8"/><rect x="4.2" y="13.6" width="6.2" height="6.2" rx="1.8"/><rect x="13.6" y="13.6" width="6.2" height="6.2" rx="1.8"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15.8 4.6v14.8L5.6 12z" fill="currentColor"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M8.2 4.6v14.8L18.4 12z" fill="currentColor"/></symbol>
+    <symbol id="i-again" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2.2-5.1"/><path d="M5 4.6v4.6h4.6"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M9.2 12.6V5.1a1.7 1.7 0 0 1 3.4 0v5.5"/><path d="M12.6 10.4a1.6 1.6 0 0 1 3.2.2v.7"/><path d="M15.8 11.2a1.6 1.6 0 0 1 3.2.3v3.3a5.7 5.7 0 0 1-5.7 5.7h-1.1a5.6 5.6 0 0 1-4.4-2.1l-3.3-4.2a1.6 1.6 0 0 1 2.4-2.1l2.3 2.2"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A7.6 7.6 0 0 0 7 6.5l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 3l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 2.6-1.5l2.4 1 2-3.4z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z" fill="currentColor" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<!-- Home: two big tiles -->
+<main class="screen screen-home" id="home">
+  <button class="tile" id="tileLetters" type="button" aria-label="Letters">
+    <span class="tile-word" id="wordLetters"></span>
+    <span class="dots" id="dotsLetters"></span>
+  </button>
+  <button class="tile" id="tileNumbers" type="button" aria-label="Numbers">
+    <span class="tile-word" id="wordNumbers"></span>
+    <span class="dots" id="dotsNumbers"></span>
+  </button>
+</main>
+
+<!-- Grid: every letter or number of one set -->
+<section class="screen screen-grid" id="grid" hidden>
+  <button class="kbtn" id="gridHome" type="button" aria-label="Home"><svg class="ico"><use href="#i-home"/></svg></button>
+  <div class="bubbles" id="bubbles"></div>
+</section>
+
+<!-- Trace: one glyph. The buttons live outside the letter's area. -->
+<section class="screen screen-trace" id="trace" hidden>
+  <button class="kbtn b-grid" id="toGrid" type="button" aria-label="All letters"><svg class="ico"><use href="#i-grid"/></svg></button>
+  <button class="kbtn b-hand" id="showMe" type="button" aria-label="Show me"><svg class="ico i-show"><use href="#i-hand"/></svg><svg class="ico i-redo"><use href="#i-again"/></svg></button>
+  <button class="kbtn b-prev" id="prev" type="button" aria-label="Back"><svg class="ico"><use href="#i-prev"/></svg></button>
+  <button class="kbtn b-next" id="next" type="button" aria-label="Next"><svg class="ico"><use href="#i-next"/></svg></button>
+  <div class="stage" id="stage"></div>
+</section>
+
+</body>
+</html>

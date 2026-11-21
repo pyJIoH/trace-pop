@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trace Pop — glyph preview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin: 0; padding: 20px; background: #FFF4DC; color: #5A4634; font: 15px/1.4 system-ui, -apple-system, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { margin: 0 0 14px; color: #8a7861; max-width: 70ch; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  button { font: inherit; padding: 8px 14px; border-radius: 10px; border: 1px solid #d9c7a3; background: #fff; color: inherit; cursor: pointer; }
+  button:hover { background: #fffaf0; }
+  .key { display: flex; gap: 12px; align-items: center; margin-left: auto; }
+  .key span { display: inline-flex; align-items: center; gap: 5px; }
+  .key i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  .cell { background: #fff; border-radius: 16px; padding: 10px 10px 8px; box-shadow: 0 3px 0 #E6D2AC; }
+  .cell svg { display: block; width: 100%; height: 230px; overflow: visible; cursor: pointer; }
+  .cell footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+  .cell b { font-size: 17px; }
+  .cell small { color: #8a7861; }
+  .cell button { padding: 4px 10px; }
+  .rule { stroke: #E9D9B8; stroke-width: 0.8; }
+  .rule.mid { stroke-dasharray: 4 4; }
+  .box { fill: none; stroke: #f0e6d0; stroke-width: 0.6; stroke-dasharray: 2 2; }
+  .road { fill: none; stroke: #ECE6DA; stroke-linecap: round; stroke-linejoin: round; }
+  .pen { fill: none; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+  .arrow { stroke: none; }
+  .start { stroke: #fff; stroke-width: 1.2; }
+  .num { fill: #fff; font: 700 7.5px system-ui, sans-serif; text-anchor: middle; dominant-baseline: central; }
+  .play { fill: none; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; opacity: 0.55; }
+</style>
+<script src="../js/util.js"></script>
+<script src="../js/glyphs.js"></script>
+<script src="../js/tracer.js"></script>
+</head>
+<body>
+<h1>Glyph preview</h1>
+<p>Every letter and digit as the app draws it. A numbered dot is where a stroke starts, the arrows show its direction. Click a glyph (or “Play”) to watch the strokes being written in order.</p>
+<div class="bar">
+  <button id="playAll" type="button">Play all, one by one</button>
+  <div class="key" id="key"></div>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+(function () {
+  'use strict';
+  const TP = window.TP;
+  const G = TP.glyphs;
+  const el = TP.svgEl;
+  const ORDER = ['#3D7BE9', '#F2762A', '#1FA36B', '#9B59D0', '#D9456F']; // stroke 1, 2, 3 …
+  const PAD = 14;
+  const cells = [];
+
+  document.getElementById('key').innerHTML = ORDER.slice(0, 4).map((c, i) => `<span><i style="background:${c}"></i>stroke ${i + 1}</span>`).join('');
+
+  for (const g of G.all) {
+    const strokes = G.sampled(g);
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    const svg = el('svg', { viewBox: `${-PAD} ${-PAD} ${g.w + PAD * 2} ${100 + PAD * 2}` }, cell);
+    el('line', { class: 'rule', x1: -PAD, x2: g.w + PAD, y1: 0, y2: 0 }, svg);
+    el('line', { class: 'rule mid', x1: -PAD, x2: g.w + PAD, y1: 50, y2: 50 }, svg);
+    el('line', { class: 'rule', x1: -PAD, x2: g.w + PAD, y1: 100, y2: 100 }, svg);
+    el('rect', { class: 'box', x: 0, y: 0, width: g.w, height: 100 }, svg);
+    for (const st of strokes) el('path', { class: 'road', d: st.d, 'stroke-width': TP.TUNING.roadW }, svg);
+    const playLayer = el('g', {}, svg);
+    strokes.forEach((st, i) => {
+      const color = ORDER[i % ORDER.length];
+      el('path', { class: 'pen', d: st.d, stroke: color }, svg);
+      // Arrowheads along the stroke, from the engine's own points (so a wrong sampler would show).
+      const gap = st.len < 60 ? st.len / 2 : 26;
+      for (let s = gap; s < st.len - 2; s += gap) {
+        const at = G.at(st, s);
+        el('path', { class: 'arrow', d: 'M3.6 0 L-3 -3.4 L-1.4 0 L-3 3.4 Z', fill: color, transform: `translate(${at.x} ${at.y}) rotate(${at.a * 180 / Math.PI})` }, svg);
+      }
+      const end = G.at(st, st.len);
+      el('path', { class: 'arrow', d: 'M3.6 0 L-3 -3.4 L-1.4 0 L-3 3.4 Z', fill: color, transform: `translate(${end.x} ${end.y}) rotate(${end.a * 180 / Math.PI})` }, svg);
+    });
+    // Start dots last, so they sit on top. Dots that share a place are nudged apart.
+    const used = [];
+    strokes.forEach((st, i) => {
+      let x = st.x[0];
+      let y = st.y[0];
+      while (used.some((u) => Math.hypot(u[0] - x, u[1] - y) < 9)) x += 10;
+      used.push([x, y]);
+      el('circle', { class: 'start', cx: x, cy: y, r: 5.2, fill: ORDER[i % ORDER.length] }, svg);
+      el('text', { class: 'num', x, y: y + 0.3 }, svg).textContent = String(i + 1);
+    });
+    const footer = document.createElement('footer');
+    footer.innerHTML = `<span><b>${g.id}</b> <small>${strokes.length} stroke${strokes.length === 1 ? '' : 's'} · w ${g.w}</small></span>`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Play';
+    footer.appendChild(btn);
+    cell.appendChild(footer);
+    document.getElementById('grid').appendChild(cell);
+
+    let run = 0;
+    function play() {
+      const mine = ++run;
+      playLayer.textContent = '';
+      return new Promise((resolve) => {
+        let i = 0;
+        function next() {
+          if (mine !== run) { resolve(); return; }
+          if (i >= strokes.length) { setTimeout(() => { if (mine === run) playLayer.textContent = ''; resolve(); }, 900); return; }
+          const st = strokes[i];
+          const line = el('path', { class: 'play', d: st.d, stroke: g.color }, playLayer);
+          const dot = el('circle', { r: 6, fill: '#2EBD59', stroke: '#fff', 'stroke-width': 1.5 }, playLayer);
+          const ms = TP.clamp(st.len / 100 * TP.TUNING.demoMsPer100, TP.TUNING.demoMinMs, TP.TUNING.demoMaxMs);
+          const t0 = performance.now();
+          (function frame(now) {
+            if (mine !== run) { resolve(); return; }
+            const t = Math.min(1, (now - t0) / ms);
+            const s = st.len * t;
+            const at = G.at(st, s);
+            dot.setAttribute('cx', at.x);
+            dot.setAttribute('cy', at.y);
+            line.style.strokeDasharray = `${Math.max(0.01, s)} ${st.len + 20}`;
+            if (t < 1) requestAnimationFrame(frame);
+            else { dot.remove(); i++; setTimeout(next, 250); }
+          })(t0);
+        }
+        next();
+      });
+    }
+    svg.addEventListener('click', play);
+    btn.addEventListener('click', play);
+    cells.push({ cell, play });
+  }
+
+  document.getElementById('playAll').addEventListener('click', async () => {
+    for (const c of cells) {
+      c.cell.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      await c.play();
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Pop — voice review</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: #FFF4DC; color: #5A4634; font: 15px/1.4 system-ui, -apple-system, sans-serif; }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  p.lead { margin: 0 0 14px; color: #8a7861; max-width: 70ch; }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 0 12px; background: #FFF4DC; }
+  button { padding: 8px 14px; border: 1px solid #d9c7a3; border-radius: 10px; background: #fff; color: inherit; font: inherit; cursor: pointer; }
+  h2 { margin: 22px 0 8px; font-size: 0.95rem; color: #8a7861; text-transform: uppercase; letter-spacing: 0.04em; }
+  .rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 6px; }
+  .row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; background: #fff; border: 1px solid #ecdfc4; border-radius: 12px; }
+  .row.playing { outline: 3px solid #3D9BE9; }
+  .row.missing { opacity: 0.55; }
+  .sign { width: 34px; text-align: center; font-weight: 700; font-size: 1.25rem; }
+  .text b { display: block; }
+  .text small { color: #8a7861; font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<h1>Voice review</h1>
+<p class="lead">Every phrase the app can say. Tap ▶ to hear it. The grey name under a phrase is its key: quote it to ask for a remake (<code>node tools/make-audio.mjs --takes=3 --only=letter-g</code>). The text in bold is what the voice was given to read.</p>
+<div class="bar"><button id="all" type="button">Play all</button><button id="stop" type="button">Stop</button></div>
+<div id="list"></div>
+<script src="../js/glyphs.js"></script>
+<script src="../js/speech.js"></script>
+<script>
+(function () {
+  const { glyphs, speech } = window.TP;
+  const audio = new Audio();
+  let queue = [];
+  let current = null;
+  function playNext() {
+    if (current) current.row.classList.remove('playing');
+    current = queue.shift() || null;
+    if (!current) return;
+    current.row.classList.add('playing');
+    current.row.scrollIntoView({ block: 'nearest' });
+    audio.src = current.src;
+    audio.play().catch(playNext);
+  }
+  audio.addEventListener('ended', () => setTimeout(playNext, 500));
+  audio.addEventListener('error', () => { if (current) current.row.classList.add('missing'); playNext(); });
+  function play(list) { audio.pause(); if (current) current.row.classList.remove('playing'); queue = list.slice(); playNext(); }
+
+  const groups = [
+    ['Letters', glyphs.set('letter').map((g) => [speech.keyFor(g), g.id])],
+    ['Numbers', glyphs.set('number').map((g) => [speech.keyFor(g), g.id])],
+    ['Tiles', [['letters', 'ABC'], ['numbers', '123']]],
+    ['Praise', speech.PRAISE.map((k) => [k, '★'])],
+    ['Hint and finale', [['hint-start', '?'], ['all-letters', 'A–Z'], ['all-numbers', '0–9']]],
+  ];
+  const list = document.getElementById('list');
+  const rows = [];
+  for (const [title, items] of groups) {
+    const h = document.createElement('h2');
+    h.textContent = title;
+    const box = document.createElement('div');
+    box.className = 'rows';
+    list.append(h, box);
+    for (const [key, sign] of items) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = '<div class="sign"></div><div class="text"><b></b><small></small></div><button type="button">▶</button>';
+      row.querySelector('.sign').textContent = sign;
+      row.querySelector('b').textContent = speech.SAY[key] || '(no phrase)';
+      row.querySelector('small').textContent = key;
+      const item = { row, src: '../' + speech.url(key) };
+      row.querySelector('button').addEventListener('click', () => play([item]));
+      box.append(row);
+      rows.push(item);
+    }
+  }
+  document.getElementById('all').addEventListener('click', () => play(rows));
+  document.getElementById('stop').addEventListener('click', () => { queue = []; audio.pause(); if (current) current.row.classList.remove('playing'); current = null; });
+})();
+</script>
+</body>
+</html>
