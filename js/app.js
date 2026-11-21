@@ -156,6 +156,9 @@
       clearTimeout(popTimer);
       popTimer = setTimeout(showPop, TP.TUNING.nextPopMs);
     },
+    onHint() {
+      S.say('hint-start'); // "Draw it with your finger!", as the hand appears
+    },
     onTapDone() {
       const now = performance.now();
       if (now - lastParty < TP.TUNING.replayGapMs) return;
@@ -209,6 +212,43 @@
     $('#pop').hidden = true;
   }
 
+  // ---------- staying up to date, and working offline ----------
+  // The service worker (sw.js) keeps a copy of the app on the device. When a new version has been
+  // published, the app reloads itself to pick it up, but only while the home screen is showing,
+  // never in the middle of a drawing.
+  let applyUpdate = () => {};
+
+  function watchUpdates() {
+    if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+    const sw = navigator.serviceWorker;
+    const hadOne = !!sw.controller; // false on the very first launch: nothing to reload then
+    let reg = null;
+    let reloading = false;
+    applyUpdate = () => {
+      if (reg && reg.waiting && screen === 'home') reg.waiting.postMessage('activate');
+    };
+    sw.addEventListener('controllerchange', () => {
+      if (!hadOne || reloading) return;
+      reloading = true;
+      location.reload();
+    });
+    sw.register('sw.js').then((r) => {
+      reg = r;
+      const watch = (worker) => {
+        if (worker) worker.addEventListener('statechange', () => { if (worker.state === 'installed') applyUpdate(); });
+      };
+      watch(r.installing);
+      r.addEventListener('updatefound', () => watch(r.installing));
+      applyUpdate();
+    }).catch(() => {});
+    // An app left open for days: look for a new version each time it comes back to the front.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || !reg) return;
+      reg.update().catch(() => {});
+      applyUpdate();
+    });
+  }
+
 
   /** ◀ ▶ always work. Past either end of the set they lead back to the grid. */
   function step(by) {
@@ -242,7 +282,7 @@
       if (view.isDone()) again();
       else view.demo(); // the hand shows how it is written
     });
-    TP.onTap($('#gridHome'), () => { refreshHome(); go('home'); });
+    TP.onTap($('#gridHome'), () => { refreshHome(); go('home'); applyUpdate(); });
   }
 
   // ---------- no accidental gestures ----------
@@ -269,6 +309,7 @@
   function start() {
     guard();
     wakeSound();
+    watchUpdates();
     buildHome();
     bindTrace();
     const relayout = () => { if (screen === 'grid') layoutGrid(); };

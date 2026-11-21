@@ -1,9 +1,10 @@
 /* Trace Pop — the drawing screen's picture: the pale letter to draw over, the child's own line,
    the hand that shows how the letter is written, and the gentle hints.
 
-   The child draws freely: the line appears exactly where the finger goes. The parts of the letter
-   it has passed over take on a tint, a stroke that is nearly covered fills in neatly, and when
-   every stroke is filled the letter is done. Which parts count is decided in tracer.js; this file
+   The child draws freely, but only inside the figure: the line appears where the finger goes on
+   the letter's road and nowhere else, and it stays only if it runs along the figure (a line that
+   just crosses it fades at once). The parts of the letter the finger has run along take on a tint,
+   a stroke that is nearly covered fills in neatly, and when every stroke is filled the letter is done. Which parts count is decided in tracer.js; this file
    only feeds it finger positions and draws what it reports. */
 (function () {
   'use strict';
@@ -14,7 +15,8 @@
 
   /**
    * createTraceView(stage, hooks)
-   * hooks: onProgress({ t, x, y }), onStrokeDone({ stroke, last }), onDone(glyph), onTapDone()
+   * hooks: onProgress({ t, x, y }), onStrokeDone({ stroke, last }), onDone(glyph), onTapDone(),
+   *        onHint() — the hand has come to show how, for the first time on this glyph
    * returns: show(glyph, { intro }), demo(), restart(), celebrate(), hide(), isDone()
    */
   TP.createTraceView = function (stage, hooks) {
@@ -30,8 +32,10 @@
     let raf = 0;
     let demo = null;       // the running hand demo: { cancelled }
     let idleTimer = 0;
+    let hinted = false;    // the voice hint was given for this glyph
     let inverse = null;    // screen → glyph units
-    let ink = null;        // the line being drawn: { id, nodes, node, pts }
+    let ink = null;        // the line being drawn: { nodes, node, pts }
+    let drawing = null;    // id of the pointer that draws
     let tapStart = null;   // a tap on the finished letter
     let shown = 0;         // counts show() calls, so late timers know they are stale
 
@@ -63,7 +67,10 @@
         return p;
       });
       seen = strokes.map(() => -1);
-      inkG = el('g', { class: 'ink', 'stroke-width': T.inkW }, svg);
+      // The child's line is cut to the shape of the road: nothing can be drawn outside the figure.
+      const mask = el('mask', { id: 'inkMask', maskUnits: 'userSpaceOnUse', x: -P, y: -P, width: W + P * 2, height: 100 + P * 2 }, svg);
+      strokes.forEach((st) => el('path', { d: st.d, class: 'ink-mask', 'stroke-width': T.roadW }, mask));
+      inkG = el('g', { class: 'ink', 'stroke-width': T.inkW, mask: 'url(#inkMask)' }, svg);
       demoG = el('g', { class: 'demo-trails' }, svg);
 
       hand = el('g', { class: 'hand' }, svg);
@@ -133,9 +140,11 @@
     }
 
     // ---------- the child's own line ----------
-    function inkStart(id, pt) {
+    // The engine says where the line is: it starts when the finger enters the figure and ends when
+    // it leaves. A line too short to count (a tap, a crossing of the road) fades away at once.
+    function inkStart(pt) {
       const node = el('polyline', {}, inkG);
-      ink = { id, nodes: [node], node, pts: [pt, pt] };
+      ink = { nodes: [node], node, pts: [pt, pt] };
       inkDraw();
     }
 
@@ -156,14 +165,13 @@
       ink.node.setAttribute('points', ink.pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
     }
 
-    /** The finger lifted. A line that added nothing to the letter quietly fades away. */
-    function inkEnd(gained) {
+    function inkEnd(kept) {
       if (!ink) return;
       const nodes = ink.nodes;
       ink = null;
-      if (gained > 0) return;
+      if (kept) return;
       for (const n of nodes) n.classList.add('fading');
-      setTimeout(() => { for (const n of nodes) n.remove(); }, 900);
+      setTimeout(() => { for (const n of nodes) n.remove(); }, 450);
     }
 
     // ---------- the hand shows the way ----------
@@ -234,6 +242,10 @@
       if (tracer.state().active || demo) { armIdle(); return; }
       const todo = [];
       tracer.state().strokes.forEach((info, i) => { if (!info.done) todo.push(i); });
+      if (!hinted) { // the voice joins the hand once per glyph, not every time
+        hinted = true;
+        if (hooks.onHint) hooks.onHint();
+      }
       runDemo(todo).then(() => armIdle(T.hintRepeatMs));
     }
 
@@ -263,21 +275,20 @@
       }
       const pt = toGlyph(e);
       if (!pt || tracer.state().active) return; // one finger draws; a palm or a second hand is ignored
-      inkStart(e.pointerId, pt);
+      drawing = e.pointerId;
       stage.classList.add('drawing');
       try { stage.setPointerCapture(e.pointerId); } catch (err) { /* the pointer is already gone */ }
       tracer.down(e.pointerId, pt.x, pt.y);
     }
 
     function onMove(e) {
-      if (!tracer || !ink || e.pointerId !== ink.id) return;
+      if (!tracer || finished || e.pointerId !== drawing) return;
       const list = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
       for (const ev of list && list.length ? list : [e]) {
         const pt = toGlyph(ev);
         if (!pt) continue;
-        inkAdd(pt);
         tracer.move(e.pointerId, pt.x, pt.y);
-        if (!ink) break; // the letter was finished by this very move
+        if (finished) break; // the letter was finished by this very move
       }
     }
 
@@ -304,9 +315,12 @@
 
     // ---------- the engine's reports ----------
     function wire() {
-      tracer.on('release', (e) => {
+      tracer.on('runStart', inkStart);
+      tracer.on('runPoint', inkAdd);
+      tracer.on('runEnd', (e) => inkEnd(e.kept));
+      tracer.on('release', () => {
+        drawing = null;
         stage.classList.remove('drawing');
-        inkEnd(e.gained);
         armIdle();
       });
       tracer.on('progress', (e) => {
@@ -320,6 +334,7 @@
       tracer.on('glyphDone', () => {
         finished = true;
         ink = null;
+        drawing = null;
         clearTimeout(idleTimer);
         stopDemo();
         render();
@@ -346,6 +361,7 @@
       strokes = G.sampled(g);
       tracer = TP.createTracer(g);
       finished = false;
+      hinted = false;
       stage.classList.remove('done', 'drawing', 'demoing');
       build();
       wire();
@@ -362,6 +378,7 @@
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
       tracer = null;
       ink = null;
+      drawing = null;
       tapStart = null;
       shown++;
     }

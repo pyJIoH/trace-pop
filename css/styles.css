@@ -46,7 +46,9 @@ body {
 button { font: inherit; color: inherit; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 svg { display: block; }
 .ico { width: 55%; height: 55%; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-.glyph { width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+/* A glyph's picture fills a box of a known size and is never laid out by its own size (inside a
+   button a "100% height" is not dependable, and the picture would spill out). */
+.glyph { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 
 /* ---------- screens ---------- */
 .screen {
@@ -100,7 +102,7 @@ svg { display: block; }
 }
 #tileNumbers { animation-delay: -2.6s; }
 .tile.pressed { transform: translateY(10px); box-shadow: 0 2px 0 var(--edge), 0 6px 10px rgba(140, 100, 30, 0.16); transition-duration: 0.05s; animation: none; }
-.tile-word { min-height: 0; display: block; }
+.tile-word { position: relative; min-height: 0; display: block; }
 @keyframes tile-wobble {
   0%, 86%, 100% { rotate: 0deg; }
   89% { rotate: -1.6deg; }
@@ -125,7 +127,7 @@ svg { display: block; }
 .bubble {
   position: relative;
   margin: 0;
-  padding: 19%;
+  padding: 0;
   border: 0;
   border-radius: 30%;
   background: var(--card);
@@ -143,6 +145,7 @@ svg { display: block; }
   84% { rotate: 7deg; scale: 1.06; }
   92% { rotate: -3deg; scale: 1.02; }
 }
+.bubble .glyph { inset: 19%; width: 62%; height: 62%; }
 .bubble .star { position: absolute; top: -9%; right: -9%; width: 40%; height: 40%; color: var(--gold); stroke: var(--gold-edge); stroke-width: 1.4; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.12)); }
 
 /* ---------- trace ---------- */
@@ -190,8 +193,9 @@ svg { display: block; }
 .demo-trail { fill: none; stroke: var(--c); stroke-linecap: round; stroke-linejoin: round; opacity: 0.42; }
 .tint { fill: none; stroke: var(--c); stroke-linecap: round; stroke-linejoin: round; opacity: 0.3; }
 /* The child's own line, exactly where the finger went. */
+.ink-mask { fill: none; stroke: #fff; stroke-linecap: round; stroke-linejoin: round; }
 .ink { fill: none; stroke: var(--c); stroke-linecap: round; stroke-linejoin: round; transition: opacity 0.6s ease-out; }
-.ink .fading { opacity: 0; transition: opacity 0.8s ease-out; }
+.ink .fading { opacity: 0; transition: opacity 0.4s ease-out; }
 .stage.done .ink { opacity: 0; }
 .stage.done .road-dots { display: none; }
 
@@ -206,14 +210,17 @@ svg { display: block; }
 .pop.entering .pop-card { animation: pop-in 0.4s var(--spring) both; }
 @keyframes pop-dim { from { background: rgba(90, 70, 52, 0); } }
 @keyframes pop-in { from { opacity: 0; scale: 0.6; } }
-.pop-card { display: grid; justify-items: center; gap: clamp(14px, 3vmin, 24px); }
+.pop-card { display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 3vmin, 24px); }
 .pop-next {
   --size: clamp(150px, 52vmin, 420px);
   position: relative;
+  display: block;
+  flex: none;
+  box-sizing: border-box;
   width: var(--size);
   height: var(--size);
   margin: 0;
-  padding: 17%;
+  padding: 0;
   border: 0;
   border-radius: 24%;
   background: var(--card);
@@ -222,8 +229,9 @@ svg { display: block; }
   transition: transform 0.16s var(--spring), box-shadow 0.16s ease-out;
 }
 .pop-next.pressed { transform: translateY(calc(var(--size) * 0.04)); box-shadow: 0 2px 0 var(--edge); transition-duration: 0.05s; }
-.pop-glyph { display: grid; place-items: center; width: 100%; height: 100%; color: var(--ink-soft); }
-.pop-glyph .ico { width: 70%; height: 70%; }
+.pop-glyph { position: absolute; inset: 18%; display: block; color: var(--ink-soft); }
+.pop-glyph .ico { position: absolute; inset: 12%; width: 76%; height: 76%; }
+.pop-again { flex: none; }
 .pop-go {
   position: absolute;
   right: -9%;

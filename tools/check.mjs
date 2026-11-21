@@ -1,4 +1,5 @@
-// Checks the glyph data, the phrase list and the tracing engine. Run: node tools/check.mjs
+// Checks the glyph data, the phrase list, the offline file list and the drawing engine.
+// Run: node tools/check.mjs
 //
 //   1. every stroke path is valid and stays inside its glyph's box;
 //   2. every glyph has a phrase and an mp3, and there are no stray phrases;
@@ -80,6 +81,19 @@ const noAudio = Object.keys(speech.SAY).filter((key) => !existsSync(join(ROOT, s
 ok(noAudio.length === 0, `${noAudio.length} of ${Object.keys(speech.SAY).length} phrases have no mp3 yet (node tools/make-audio.mjs): ${noAudio.slice(0, 6).join(', ')}${noAudio.length > 6 ? ', …' : ''}`);
 console.log(`  ${Object.keys(speech.SAY).length} phrases`);
 
+// ---------- the offline copy ----------
+section('Service worker');
+{
+  const sw = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  const shell = (/const SHELL = \[([^\]]*)\]/.exec(sw) || ['', ''])[1].match(/'[^']+'/g).map((x) => x.slice(1, -1));
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const needed = [...html.matchAll(/(?:src|href)="([^"#:]+\.[a-z]+)"/g)].map((m) => m[1]);
+  for (const f of needed) ok(shell.includes(f), `sw.js: ${f} is used by index.html but is not in SHELL (it would be missing offline)`);
+  for (const f of shell) if (f !== './') ok(existsSync(join(ROOT, f)), `sw.js: SHELL lists ${f}, which does not exist`);
+  ok(/const VERSION = 'tracepop-v\d+'/.test(sw), 'sw.js: VERSION should look like tracepop-v12');
+  console.log(`  ${shell.length} app files kept for offline, ${(/VERSION = '([^']+)'/.exec(sw) || [])[1]}`);
+}
+
 // ---------- 3. the engine ----------
 section('Drawing engine');
 
@@ -154,16 +168,17 @@ for (const g of glyphs.all) {
     }
   }
 
-  // In little pieces, out of order: every stroke cut in four, pieces drawn in a shuffled order,
-  // every other one backwards.
+  // In pieces, out of order: every stroke cut into pieces of 45 units or more, drawn in a
+  // shuffled order, every other one backwards.
   r = rig(g);
   {
     const rand = rng(6);
     const pieces = [];
     for (const st of r.st) {
       const pts = fingerPath(st, 2, 3, rand);
-      const q = Math.ceil(pts.length / 4);
-      for (let k = 0; k < 4; k++) {
+      const parts = Math.max(1, Math.floor(st.len / 45));
+      const q = Math.ceil(pts.length / parts);
+      for (let k = 0; k < parts; k++) {
         const piece = pts.slice(Math.max(0, k * q - 1), (k + 1) * q + 1);
         if (piece.length > 1) pieces.push(k % 2 ? piece.reverse() : piece);
       }
@@ -173,7 +188,7 @@ for (const g of glyphs.all) {
       [pieces[k], pieces[j]] = [pieces[j], pieces[k]];
     }
     for (const piece of pieces) draw(r.t, piece);
-    ok(r.log.glyph === 1, `${g.id}: drawn in shuffled little pieces should finish (strokes ${r.log.strokes}/${n})`);
+    ok(r.log.glyph === 1, `${g.id}: drawn in shuffled pieces should finish (strokes ${r.log.strokes}/${n})`);
   }
 
   // The whole glyph without lifting the finger (jumping from stroke to stroke in a straight line).
@@ -203,6 +218,33 @@ for (const g of glyphs.all) {
     if (g.id !== 'X') ok(r.log.glyph === 0, `${g.id}: a big cross must not finish it`); // a big cross is an X
   }
 
+  // A dense scribble over the whole glyph, lines 7 units apart: across, down, and both diagonals.
+  // It crosses every part of the figure many times, but crossing is not drawing. (Where the
+  // scribble happens to run along every stroke it is drawing, and counts: up-and-down lines over
+  // a glyph made of upright strokes, a slanted scribble over the small loops of 8.)
+  const ALONG = { down: '1JMNUVWXY', 'the other diagonal': '8' };
+  if (g.id.length === 1) {
+    const span = g.w + 130;
+    const zig = (to) => {
+      const pts = [];
+      for (let k = 0; k * 7 <= span; k++) pts.push(to(k % 2 ? -15 : span, k * 7 - 15), to(k % 2 ? span : -15, k * 7 - 15));
+      return pts;
+    };
+    const ways = {
+      across: zig((u, v) => [u, v]),
+      down: zig((u, v) => [v, u]),
+      'one diagonal': zig((u, v) => [(u + v) * 0.7 - 40, (v - u) * 0.7 + 50]),
+      'the other diagonal': zig((u, v) => [(u - v) * 0.7 + 40, (u + v) * 0.7 - 40]),
+    };
+    for (const [name, pts] of Object.entries(ways)) {
+      if ((ALONG[name] || '').includes(g.id)) continue;
+      r = rig(g);
+      draw(r.t, pts);
+      ok(r.log.glyph === 0, `${g.id}: a dense scribble ${name} must not finish it`);
+      near(r, `${g.id} dense scribble ${name}`);
+    }
+  }
+
   // A doodle in the middle.
   r = rig(g);
   r.t.down(1, g.w / 2, 50);
@@ -219,19 +261,21 @@ for (const g of glyphs.all) {
   ok(r.t.state().t === 0, `${g.id}: drawing beside the glyph covered ${pct(r.t.state().t)}`);
 
   // Half a stroke stays drawn after the finger lifts; the other half finishes it.
+  // (The glyph's longest stroke: half of a short one is too short a line to count at all.)
   r = rig(g);
-  const pts = fingerPath(first, 2, 0, rng(8));
+  const longest = r.st.indexOf(r.st.reduce((a, b) => (b.len > a.len ? b : a)));
+  const pts = fingerPath(r.st[longest], 2, 0, rng(8));
   const half = Math.floor(pts.length / 2);
   draw(r.t, pts.slice(0, half));
-  const kept = r.t.state().strokes[0].t;
-  ok(!r.t.state().strokes[0].done && kept > 0.4 && kept < 0.75, `${g.id}: half a stroke should stay half drawn (${pct(kept)})`);
+  const kept = r.t.state().strokes[longest].t;
+  ok(!r.t.state().strokes[longest].done && kept > 0.4 && kept < 0.75, `${g.id}: half a stroke should stay half drawn (${pct(kept)})`);
   draw(r.t, pts.slice(half).reverse());
-  ok(r.t.state().strokes[0].done, `${g.id}: the other half should finish the stroke`);
+  ok(r.t.state().strokes[longest].done, `${g.id}: the other half should finish the stroke`);
 
   // A bit more than half of a stroke is not the stroke.
   r = rig(g);
   draw(r.t, pts.slice(0, Math.floor(pts.length * 0.6)));
-  ok(!r.t.state().strokes[0].done, `${g.id}: 60% of a stroke must not finish it (${pct(r.t.state().strokes[0].t)})`);
+  ok(!r.t.state().strokes[longest].done, `${g.id}: 60% of a stroke must not finish it (${pct(r.t.state().strokes[longest].t)})`);
 
   // A second finger (a palm, the other hand) while drawing changes nothing.
   r = rig(g);
@@ -256,14 +300,44 @@ for (const g of glyphs.all) {
   ok(r.log.strokes === 0 && r.t.state().t < 0.3, `O: a line through the middle must not count (${pct(r.t.state().t)})`);
 }
 
-// On a small screen the pixel size wins: 15 units away still covers at 1.5 px per unit.
+// A line too short to be a line along the figure (a dab, a crossing of the road) leaves nothing.
+{
+  const r = rig(glyphs.get('H'));
+  draw(r.t, [[8, 10], [8, 30]]);
+  ok(r.t.state().t === 0, 'a 20-unit dab on a stroke leaves nothing');
+  draw(r.t, [[-10, 25], [30, 25]]);
+  ok(r.t.state().t === 0, 'a line across a stroke leaves nothing');
+  draw(r.t, [[8, 10], [8, 50]]);
+  ok(r.t.state().t > 0, 'a 40-unit line along a stroke stays');
+  let ends = [];
+  const t = createTracer(glyphs.get('H'), { pxPerUnit: 4 });
+  t.on('runEnd', (e) => ends.push(e.kept));
+  draw(t, [[-10, 25], [30, 25]]);
+  draw(t, [[8, 10], [8, 50]]);
+  ok(ends.join() === 'false,true', `the view is told which lines stay (${ends.join()})`);
+}
+
+// Only the figure can be drawn on: a line right beside the road counts for nothing.
+{
+  for (const id of ['1', 'L', 'O', '8']) {
+    const g = glyphs.get(id);
+    const r = rig(g);
+    for (const st of r.st) draw(r.t, fingerPath(st, 2, 0, rng(30)).map(([x, y], i, all) => {
+      const at = glyphs.at(st, Math.min(st.len, i * 2));
+      return [x - Math.sin(at.a) * 13, y + Math.cos(at.a) * 13]; // 13 units to the side: off the road
+    }));
+    ok(r.t.state().t < 0.2 && r.log.glyph === 0, `${id}: a line beside the road must not count (${pct(r.t.state().t)})`);
+  }
+}
+
+// On a small screen the pixel size wins: 12 units off the middle is still inside at 1.5 px per unit.
 {
   const r = rig(glyphs.get('1'), { pxPerUnit: 1.5 });
-  draw(r.t, [[35, 0], [35, 100]]);
-  ok(r.log.glyph === 1, 'the finger covers a wider band on small screens (24 px)');
+  draw(r.t, [[32, 0], [32, 100]]);
+  ok(r.log.glyph === 1, 'the figure is a little wider for the finger on small screens (20 px)');
   const r2 = rig(glyphs.get('1'));
-  draw(r2.t, [[35, 0], [35, 100]]);
-  ok(r2.log.glyph === 0, 'the finger covers 12 units on big screens');
+  draw(r2.t, [[32, 0], [32, 100]]);
+  ok(r2.log.glyph === 0, 'the finger must be within 10 units of the middle of the road on big screens');
 }
 
 // Once the glyph is done, nothing more is drawn.
@@ -273,7 +347,7 @@ for (const g of glyphs.all) {
   ok(r.log.glyph === 1 && r.t.down(1, 20, 50) === false, 'a finished glyph takes no more drawing');
 }
 
-console.log(`  tuning: finger covers ${TUNING.coverUnits} units, a stroke is done at ${pct(TUNING.strokeDoneAt)}`);
+console.log(`  tuning: inside the figure = within ${TUNING.insideUnits} units of the road's middle, a line counts from ${TUNING.minRun} units, finger covers ${TUNING.coverUnits} units, a stroke is done at ${pct(TUNING.strokeDoneAt)}`);
 console.log(`  closest call among things that must not count: ${pct(closest.t)} of a stroke (${closest.what})`);
 
 console.log(`\n${failed ? `FAILED: ${failed} problem${failed === 1 ? '' : 's'}` : 'All good'} (${passed} checks passed)`);
