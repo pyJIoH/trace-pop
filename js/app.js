@@ -30,6 +30,21 @@
   let screen = 'home';
   let kind = 'letter';
   let index = 0; // the glyph on the trace screen, within its set
+  let pages = [[0, 0]]; // the grid's pages, as [from, to) places in the set
+  let page = 0;
+
+  // A set too big for one screen (the numbers) is shown a page at a time.
+  const PAGE = 20;
+  /** The pages of a set. What is left over joins the first page: 0–20, 21–40, … 81–100. */
+  function pagesOf(list) {
+    const n = list.length;
+    const count = Math.floor(n / PAGE);
+    if (n <= PAGE * 1.5 || count < 2) return [[0, n]];
+    const first = n - PAGE * (count - 1);
+    const out = [[0, first]];
+    for (let k = 1; k < count; k++) out.push([first + PAGE * (k - 1), first + PAGE * k]);
+    return out;
+  }
 
   // ---------- screens ----------
   function go(name) {
@@ -61,6 +76,7 @@
     for (const k of Object.keys(SETS)) {
       const dots = $('#dots' + SETS[k].name);
       dots.textContent = '';
+      dots.classList.toggle('many', G.set(k).length > 40); // too many for dots: a striped bar
       for (const g of G.set(k)) {
         const dot = document.createElement('i');
         if (isDone(g)) { dot.className = 'on'; dot.style.background = g.color; }
@@ -70,11 +86,29 @@
   }
 
   // ---------- grid ----------
-  function openGrid(k) {
+  /** Opens a set on the page that holds glyph number `at` (not given: the next one to draw). */
+  function openGrid(k, at) {
     kind = k;
+    const list = G.set(k);
+    pages = pagesOf(list);
+    if (at == null) at = Math.max(0, list.findIndex((g) => !isDone(g)));
+    page = Math.max(0, pages.findIndex(([from, to]) => at >= from && at < to));
     buildGrid();
     go('grid');
     layoutGrid();
+  }
+
+  /** ◀ ▶ on the grid: the page before, the page after. */
+  function turnPage(by) {
+    const to = page + by;
+    if (to < 0 || to >= pages.length) return;
+    page = to;
+    TP.lockTaps(250);
+    buildGrid();
+    const box = $('#bubbles');
+    box.classList.remove('turning');
+    void box.offsetWidth;
+    box.classList.add('turning');
   }
 
   function buildGrid() {
@@ -82,7 +116,13 @@
     box.textContent = '';
     const list = G.set(kind);
     const next = list.findIndex((g) => !isDone(g));
-    list.forEach((g, i) => {
+    const [from, to] = pages[page];
+    $('#grid').classList.toggle('paged', pages.length > 1);
+    $('#pagePrev').hidden = $('#pageNext').hidden = pages.length < 2;
+    $('#pagePrev').classList.toggle('off', page === 0);
+    $('#pageNext').classList.toggle('off', page === pages.length - 1);
+    list.slice(from, to).forEach((g, k) => {
+      const i = from + k;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'bubble' + (isDone(g) ? ' done' : '') + (i === next ? ' next-up' : '');
@@ -100,10 +140,11 @@
     });
   }
 
-  /** Picks the number of columns that gives the biggest bubbles with no scrolling. */
+  /** Picks the number of columns that gives the biggest bubbles with no scrolling.
+      (Every page is laid out like the fullest one, so the bubbles keep their size from page to page.) */
   function layoutGrid() {
     const box = $('#bubbles');
-    const n = box.children.length;
+    const n = Math.max(...pages.map(([from, to]) => to - from));
     const W = box.clientWidth;
     const H = box.clientHeight;
     if (!n || !W || !H) return;
@@ -182,6 +223,7 @@
     $('#trace').classList.remove('done');
     $('#trace').style.setProperty('--c', g.color);
     noteStep = 0;
+    S.preload([SP.keyFor(g)]); // its name will be wanted soon
     view.show(g); // silently: the voice names the glyph only once it is drawn
   }
 
@@ -227,7 +269,7 @@
   function step(by) {
     const list = G.set(kind);
     const to = index + by;
-    if (to < 0 || to >= list.length) { openGrid(kind); return; }
+    if (to < 0 || to >= list.length) { openGrid(kind, index); return; }
     index = to;
     TP.lockTaps(250);
     showGlyph();
@@ -242,7 +284,9 @@
   }
 
   function bindTrace() {
-    TP.onTap($('#toGrid'), () => openGrid(kind));
+    TP.onTap($('#toGrid'), () => openGrid(kind, index));
+    TP.onTap($('#pagePrev'), () => turnPage(-1));
+    TP.onTap($('#pageNext'), () => turnPage(1));
     TP.onTap($('#prev'), () => step(-1));
     TP.onTap($('#next'), () => step(1));
     TP.onTap($('#showMe'), () => {
@@ -270,7 +314,9 @@
       document.addEventListener(type, () => S.unlock(), { capture: true, passive: true });
     }
     S.setOptions({ voice: state.settings.voice, sounds: state.settings.sounds });
-    S.preload(Object.keys(SP.SAY)); // the clips are small: all of them are decoded ahead of time
+    // Decoded ahead of time: everything but the names of the glyphs (there are over a hundred of
+    // those; each is loaded when its glyph comes up on the drawing screen).
+    S.preload(SP.OTHER);
   }
 
   function start() {

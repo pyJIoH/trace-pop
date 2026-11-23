@@ -35,17 +35,17 @@ function ok(cond, what) {
 section('Glyphs');
 const SHAPES = ['circle', 'oval', 'square', 'rectangle', 'triangle', 'diamond', 'semicircle', 'star', 'heart', 'cross'];
 const PICTURES = ['sun', 'moon', 'cloud', 'house', 'tree', 'flower', 'apple', 'fish', 'boat', 'balloon', 'umbrella', 'car'];
-const wantIds = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...Array.from({ length: 31 }, (_, i) => String(i)), ...SHAPES, ...PICTURES];
+const wantIds = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...Array.from({ length: 101 }, (_, i) => String(i)), ...SHAPES, ...PICTURES];
 ok(glyphs.set('shape').map((g) => g.id).join() === SHAPES.join(), 'the shapes are not the expected ones');
 ok(glyphs.set('picture').map((g) => g.id).join() === PICTURES.join(), 'the pictures are not the expected ones');
-/** One figure, not a number put together from two digits. */
+/** One figure, not a number put together from several digits. */
 const single = (g) => !(g.kind === 'number' && g.id.length > 1);
 const drawn = (g) => g.kind === 'shape' || g.kind === 'picture';
 ok(glyphs.all.length === wantIds.length, `expected ${wantIds.length} glyphs, found ${glyphs.all.length}`);
 for (const id of wantIds) ok(!!glyphs.get(id), `glyph ${id} is missing`);
 ok(new Set(glyphs.all.map((g) => g.id)).size === glyphs.all.length, 'glyph ids repeat');
 for (const g of glyphs.all) {
-  const widest = !single(g) ? 190 : drawn(g) ? 150 : 90; // a number of two digits is two glyphs wide
+  const widest = !single(g) ? 95 * g.id.length : drawn(g) ? 150 : 90; // a number is as wide as its digits side by side
   ok(g.w >= 40 && g.w <= widest, `${g.id}: width ${g.w} is outside 40–${widest}`);
   ok(g.strokes.length >= 1, `${g.id}: no strokes`);
   ok(/^#[0-9A-F]{6}$/i.test(g.color), `${g.id}: no colour`);

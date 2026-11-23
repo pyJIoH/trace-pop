@@ -114,11 +114,23 @@ svg { display: block; }
 }
 .dots { display: flex; justify-content: center; gap: clamp(2px, 0.9vmin, 7px); height: clamp(6px, 1.6vmin, 12px); }
 .dots i { flex: 0 1 clamp(6px, 1.6vmin, 12px); height: 100%; border-radius: 50%; background: #EFE6D2; }
+/* Too many for dots (the numbers): one bar, a stripe for each. */
+.dots.many { gap: 0; border-radius: 99px; overflow: hidden; }
+.dots.many i { flex: 1 1 0; border-radius: 0; }
 
 /* ---------- grid ---------- */
-.screen-grid { grid-template: auto 1fr / 1fr; }
-@media (orientation: landscape) { .screen-grid { grid-template: 1fr / auto 1fr; } }
+.screen-grid { grid-template: "home" auto "bubbles" 1fr / 1fr; }
+@media (orientation: landscape) { .screen-grid { grid-template: "home bubbles" 1fr / auto 1fr; } }
+/* A set shown a page at a time (the numbers): ◀ ▶ are where they are on the drawing screen. */
+.screen-grid.paged { grid-template: "home . ." auto "bubbles bubbles bubbles" 1fr "prev . next" auto / auto 1fr auto; }
+@media (orientation: landscape) {
+  .screen-grid.paged { grid-template: "home bubbles ." 1fr "prev bubbles next" auto ". bubbles ." 1fr / auto 1fr auto; }
+}
+.b-home { grid-area: home; align-self: start; }
+.kbtn.off { visibility: hidden; }
+.bubbles.turning { animation: screen-in 0.2s ease-out both; }
 .bubbles {
+  grid-area: bubbles;
   min-width: 0;
   min-height: 0;
   display: grid;

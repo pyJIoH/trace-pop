@@ -75,9 +75,9 @@
     return parse(d).map(({ c, n }) => c + n.map((v, i) => (X[c].includes(i) ? +(v + dx).toFixed(1) : v)).join(' ')).join(' ');
   }
 
-  // 10 … 30: two digits side by side, each written the way it is written alone.
+  // 10 … 100: the digits side by side, each written the way it is written alone.
   const DIGIT_GAP = 10;
-  const LAST_NUMBER = 30;
+  const LAST_NUMBER = 100;
   for (let n = 10; n <= LAST_NUMBER; n++) {
     const strokes = [];
     let x = 0;

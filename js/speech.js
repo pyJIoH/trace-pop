@@ -10,12 +10,18 @@
     J: 'Jay', K: 'Kay', L: 'El', M: 'Em', N: 'En', O: 'Oh', P: 'Pee', Q: 'Cue', R: 'Ar', S: 'Ess',
     T: 'Tee', U: 'You', V: 'Vee', W: 'Double-you', X: 'Ex', Y: 'Why', Z: 'Zee',
   };
-  const NUMBER_NAMES = [
+  // 0 … 100 (the same range as the numbers in glyphs.js; tools/check.mjs checks that they agree).
+  const SMALL = [
     'Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
     'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen',
-    'Twenty', 'Twenty-one', 'Twenty-two', 'Twenty-three', 'Twenty-four', 'Twenty-five', 'Twenty-six', 'Twenty-seven',
-    'Twenty-eight', 'Twenty-nine', 'Thirty',
   ];
+  const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const numberName = (n) => {
+    if (n < 20) return SMALL[n];
+    if (n === 100) return 'One hundred';
+    return TENS[Math.floor(n / 10)] + (n % 10 ? '-' + SMALL[n % 10].toLowerCase() : '');
+  };
+  const LAST_NUMBER = 100;
 
   const SHAPE_NAMES = {
     circle: 'Circle', oval: 'Oval', square: 'Square', rectangle: 'Rectangle', triangle: 'Triangle',
@@ -28,7 +34,7 @@
 
   const SAY = {};
   for (const [id, name] of Object.entries(LETTER_NAMES)) SAY['letter-' + id.toLowerCase()] = name + '!';
-  NUMBER_NAMES.forEach((name, i) => { SAY['num-' + i] = name + '!'; });
+  for (let n = 0; n <= LAST_NUMBER; n++) SAY['num-' + n] = numberName(n) + '!';
   for (const [id, name] of Object.entries(SHAPE_NAMES)) SAY['shape-' + id] = name + '!';
   for (const [id, name] of Object.entries(PICTURE_NAMES)) SAY['pic-' + id] = name + '!';
   Object.assign(SAY, {
